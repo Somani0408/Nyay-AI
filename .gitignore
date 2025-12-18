@@ -1,0 +1,4 @@
+indian-legal-model/
+*.gguf
+*.bin
+.env
