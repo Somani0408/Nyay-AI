@@ -1,134 +1,75 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
-from llama_cpp import Llama
-import os
 from functools import wraps
+import os
+import google.generativeai as genai
 
-# 1. Initialize Flask App
+# ---------------- CONFIG ---------------- #
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-change-this-in-production'
+app.secret_key = "change-this-secret"
 
-# Simple user database (demo only)
-users = {
-    'demo': 'password123'
-}
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel("gemini-1.5-flash")
 
-# 2. Define the path to your GGUF model file
-model_filename = "./indian-legal-model/outpt_file.gguf"
-model_path = os.path.abspath(model_filename)
-print(f"Loading GGUF model from: {model_path}")
-
-# 3. Load the Model
-try:
-    llm = Llama(
-        model_path=model_path,
-        n_gpu_layers=0,   # IMPORTANT: CPU only
-        n_ctx=4096,
-        verbose=True,
-    )
-    print("GGUF Model loaded successfully!")
-except Exception as e:
-    print("ERROR: Failed to load GGUF model.")
-    print(e)
-    exit()
+# Demo users
+users = {"demo": "password123"}
 
 # ---------------- AUTH ---------------- #
-
 def login_required(f):
     @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'username' not in session:
-            return redirect(url_for('login'))
+    def decorated(*args, **kwargs):
+        if "username" not in session:
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
-    return decorated_function
+    return decorated
 
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-
-        if username in users and users[username] == password:
-            session['username'] = username
-            return redirect(url_for('index'))
-
-        return render_template('login.html', error='Invalid credentials')
-
-    return render_template('login.html')
+    if request.method == "POST":
+        u = request.form["username"]
+        p = request.form["password"]
+        if u in users and users[u] == p:
+            session["username"] = u
+            return redirect(url_for("index"))
+        return render_template("login.html", error="Invalid credentials")
+    return render_template("login.html")
 
 
-@app.route('/signup', methods=['GET', 'POST'])
-def signup():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        confirm = request.form.get('confirm_password')
-
-        if username in users:
-            return render_template('signup.html', error='Username already exists')
-
-        if password != confirm:
-            return render_template('signup.html', error='Passwords do not match')
-
-        users[username] = password
-        session['username'] = username
-        return redirect(url_for('index'))
-
-    return render_template('signup.html')
-
-
-@app.route('/logout')
+@app.route("/logout")
 def logout():
-    session.pop('username', None)
-    return redirect(url_for('login'))
+    session.pop("username", None)
+    return redirect(url_for("login"))
 
-# ---------------- MAIN APP ---------------- #
-
+# ---------------- MAIN ---------------- #
 @app.route("/")
 @login_required
 def index():
-    username = session.get('username', 'User')
-    return render_template("index.html", username=username)
+    return render_template("index.html", username=session["username"])
 
 
 @app.route("/get_response", methods=["POST"])
 @login_required
 def get_response():
-    try:
-        history = request.json["history"]
-        username = session.get('username', 'User')
+    history = request.json["history"]
+    username = session["username"]
 
-        prompt = f"""### Instruction:
-You are Nyay AI, an esteemed legal scholar and expert assistant on Indian Law.
-Maintain a formal and professional tone.
-The user's name is {username}. Address them naturally.
+    prompt = f"""
+You are Nyay AI, an expert assistant on Indian Law.
+Respond clearly and professionally.
+User name: {username}
 
 """
 
-        for msg in history:
-            if msg["role"] == "user":
-                prompt += f"### User:\n{msg['content']}\n\n"
-            else:
-                prompt += f"### Assistant:\n{msg['content']}\n\n"
+    for msg in history:
+        role = "User" if msg["role"] == "user" else "Assistant"
+        prompt += f"{role}: {msg['content']}\n"
 
-        prompt += "### Assistant:\n"
+    response = model.generate_content(prompt)
 
-        output = llm(
-            prompt,
-            max_tokens=1024,
-            temperature=0.7,
-            top_p=0.9,
-            repeat_penalty=1.1,
-            stop=["### User:", "### Instruction:"],
-        )
-
-        response = output["choices"][0]["text"].strip()
-        return jsonify({"response": response})
-
-    except Exception as e:
-        print("Inference error:", e)
-        return jsonify({"response": "Internal server error"}), 500
+    return jsonify({
+        "response": response.text
+    })
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
