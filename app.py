@@ -1,14 +1,12 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from functools import wraps
-import os
 import google.generativeai as genai
+import os
+
 
 # ---------------- CONFIG ---------------- #
 app = Flask(__name__)
 app.secret_key = "change-this-secret"
-
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-model = genai.GenerativeModel("gemini-1.5-flash")
 
 # Demo users
 users = {"demo": "password123"}
@@ -50,8 +48,17 @@ def index():
 @login_required
 def get_response():
     try:
-        history = request.json["history"]
-        username = session["username"]
+        history = request.json.get("history", [])
+        username = session.get("username", "User")
+
+        # ✅ Get API key at runtime
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return jsonify({"response": "Server configuration error."}), 500
+
+        # ✅ Initialize Gemini INSIDE the function
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel("gemini-1.5-flash")
 
         prompt = f"""
 You are Nyay AI, an expert assistant on Indian Law.
@@ -66,18 +73,15 @@ User name: {username}
 
         result = model.generate_content(prompt)
 
-        # ✅ SAFE HANDLING (this prevents crashes)
-        if not result or not result.text:
+        if not result or not getattr(result, "text", None):
             return jsonify({
-                "response": "I’m unable to answer this right now. Please rephrase your question."
+                "response": "I couldn't generate a response. Please rephrase your question."
             })
 
-        return jsonify({
-            "response": result.text
-        })
+        return jsonify({"response": result.text})
 
     except Exception as e:
-        print("Gemini Error:", e)
+        print("🔥 GEMINI ERROR:", e)
         return jsonify({
             "response": "Temporary server error. Please try again."
         }), 500
