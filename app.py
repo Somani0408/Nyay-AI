@@ -46,30 +46,38 @@ def logout():
 def index():
     return render_template("index.html", username=session["username"])
 
-
 @app.route("/get_response", methods=["POST"])
 @login_required
 def get_response():
-    history = request.json["history"]
-    username = session["username"]
+    try:
+        history = request.json["history"]
+        username = session["username"]
 
-    prompt = f"""
+        prompt = f"""
 You are Nyay AI, an expert assistant on Indian Law.
-Respond clearly and professionally.
+Answer clearly and professionally.
 User name: {username}
 
 """
 
-    for msg in history:
-        role = "User" if msg["role"] == "user" else "Assistant"
-        prompt += f"{role}: {msg['content']}\n"
+        for msg in history:
+            role = "User" if msg["role"] == "user" else "Assistant"
+            prompt += f"{role}: {msg['content']}\n"
 
-    response = model.generate_content(prompt)
+        result = model.generate_content(prompt)
 
-    return jsonify({
-        "response": response.text
-    })
+        # ✅ SAFE HANDLING (this prevents crashes)
+        if not result or not result.text:
+            return jsonify({
+                "response": "I’m unable to answer this right now. Please rephrase your question."
+            })
 
+        return jsonify({
+            "response": result.text
+        })
 
-if __name__ == "__main__":
-    app.run()
+    except Exception as e:
+        print("Gemini Error:", e)
+        return jsonify({
+            "response": "Temporary server error. Please try again."
+        }), 500
