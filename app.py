@@ -4,20 +4,17 @@ import google.generativeai as genai
 import os
 
 # ---------------- GEMINI CONFIG ---------------- #
-genai.configure(api_key=os.environ["GEMINI_API_KEY"]) 
-model = genai.GenerativeModel(
-    model_name="models/gemini-1.5-flash"
-)
+genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 
+# ✅ ONLY THIS MODEL WORKS WITH v1beta
+model = genai.GenerativeModel("models/gemini-1.0-pro")
 
 # ---------------- APP CONFIG ---------------- #
 app = Flask(__name__)
 app.secret_key = "change-this-secret"
 
-# Demo users
 users = {"demo": "password123"}
 
-# ---------------- AUTH ---------------- #
 def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -25,7 +22,6 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -38,19 +34,15 @@ def login():
         return render_template("login.html", error="Invalid credentials")
     return render_template("login.html")
 
-
 @app.route("/logout")
 def logout():
     session.pop("username", None)
     return redirect(url_for("login"))
 
-
-# ---------------- MAIN ---------------- #
 @app.route("/")
 @login_required
 def index():
     return render_template("index.html", username=session["username"])
-
 
 @app.route("/get_response", methods=["POST"])
 @login_required
@@ -72,19 +64,11 @@ User name: {username}
 
         result = model.generate_content(prompt)
 
-        if not result or not getattr(result, "text", None):
-            return jsonify({
-                "response": "I couldn't generate a response. Please try again."
-            })
-
         return jsonify({"response": result.text})
 
     except Exception as e:
         print("🔥 GEMINI ERROR:", e)
-        return jsonify({
-            "response": "Temporary server error. Please try again."
-        }), 500
-
+        return jsonify({"response": "Temporary server error"}), 500
 
 if __name__ == "__main__":
     app.run()
