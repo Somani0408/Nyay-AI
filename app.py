@@ -1,14 +1,13 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from functools import wraps
 import google.generativeai as genai
-import os 
+import os
 
+# ---------------- GEMINI CONFIG ---------------- #
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
-model = genai.GenerativeModel("models/gemini-1.5-flash")
-
-
-# ---------------- CONFIG ---------------- #
+# ---------------- APP CONFIG ---------------- #
 app = Flask(__name__)
 app.secret_key = "change-this-secret"
 
@@ -28,8 +27,8 @@ def login_required(f):
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        u = request.form["username"]
-        p = request.form["password"]
+        u = request.form.get("username")
+        p = request.form.get("password")
         if u in users and users[u] == p:
             session["username"] = u
             return redirect(url_for("index"))
@@ -42,34 +41,26 @@ def logout():
     session.pop("username", None)
     return redirect(url_for("login"))
 
+
 # ---------------- MAIN ---------------- #
 @app.route("/")
 @login_required
 def index():
     return render_template("index.html", username=session["username"])
 
+
 @app.route("/get_response", methods=["POST"])
 @login_required
 def get_response():
     try:
-        history = request.json.get("history", [])
+        data = request.get_json()
+        history = data.get("history", [])
         username = session.get("username", "User")
-
-        # ✅ Get API key at runtime
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            return jsonify({"response": "Server configuration error."}), 500
-
-        # ✅ Initialize Gemini INSIDE the function
-        genai.configure(api_key=api_key)
-       model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-
 
         prompt = f"""
 You are Nyay AI, an expert assistant on Indian Law.
 Answer clearly and professionally.
 User name: {username}
-
 """
 
         for msg in history:
@@ -80,7 +71,7 @@ User name: {username}
 
         if not result or not getattr(result, "text", None):
             return jsonify({
-                "response": "I couldn't generate a response. Please rephrase your question."
+                "response": "I couldn't generate a response. Please try again."
             })
 
         return jsonify({"response": result.text})
@@ -90,3 +81,7 @@ User name: {username}
         return jsonify({
             "response": "Temporary server error. Please try again."
         }), 500
+
+
+if __name__ == "__main__":
+    app.run()
