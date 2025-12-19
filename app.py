@@ -62,7 +62,7 @@ def get_response():
 
         # ✅ Initialize Gemini INSIDE the function
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("models/gemini-1.5-flash")
+       model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 
 
         prompt = f"""
