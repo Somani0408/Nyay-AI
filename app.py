@@ -5,7 +5,7 @@ import os
 
 # ---------------- GEMINI CONFIG ---------------- #
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-model = genai.GenerativeModel("text-bison-001")
+model = genai.GenerativeModel("gemini-1.5-flash")
 
 # ---------------- APP CONFIG ---------------- #
 app = Flask(__name__)
