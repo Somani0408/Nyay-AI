@@ -1,13 +1,10 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from functools import wraps
-import google.generativeai as genai
+from google import genai
 import os
 
-# ---------------- GEMINI CONFIG ---------------- #
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
-
-# ✅ ONLY THIS MODEL WORKS WITH v1beta
-model = genai.GenerativeModel("models/gemini-1.0-pro")
+# ---------------- GEMINI CLIENT ---------------- #
+client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
 # ---------------- APP CONFIG ---------------- #
 app = Flask(__name__)
@@ -52,19 +49,17 @@ def get_response():
         history = data.get("history", [])
         username = session.get("username", "User")
 
-        prompt = f"""
-You are Nyay AI, an expert assistant on Indian Law.
-Answer clearly and professionally.
-User name: {username}
-"""
+        prompt = f"You are Nyay AI, an expert assistant on Indian Law.\nUser name: {username}\n"
 
         for msg in history:
-            role = "User" if msg["role"] == "user" else "Assistant"
-            prompt += f"{role}: {msg['content']}\n"
+            prompt += f"{msg['role']}: {msg['content']}\n"
 
-        result = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt
+        )
 
-        return jsonify({"response": result.text})
+        return jsonify({"response": response.text})
 
     except Exception as e:
         print("🔥 GEMINI ERROR:", e)
