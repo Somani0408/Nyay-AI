@@ -1,7 +1,11 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session
 from functools import wraps
 import google.generativeai as genai
-import os
+import os 
+
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+
+model = genai.GenerativeModel("models/gemini-1.5-flash")
 
 
 # ---------------- CONFIG ---------------- #
@@ -58,7 +62,8 @@ def get_response():
 
         # ✅ Initialize Gemini INSIDE the function
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("models/gemini-1.5-flash")
+
 
         prompt = f"""
 You are Nyay AI, an expert assistant on Indian Law.
